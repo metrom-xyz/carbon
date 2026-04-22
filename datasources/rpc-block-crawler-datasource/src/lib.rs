@@ -1,4 +1,4 @@
-use carbon_core::datasource::DatasourceId;
+use carbon_core::datasource::{BlockDetails, DatasourceId};
 pub use solana_client::rpc_config::RpcBlockConfig;
 use solana_hash::Hash;
 use std::str::FromStr;
@@ -340,6 +340,19 @@ fn task_processor(
                             .increment_counter("block_crawler_blocks_processed", 1)
                             .await
                             .unwrap_or_else(|value| log::error!("Error recording metric: {value}"));
+
+                        if let Err(err) = sender.try_send((Update::BlockDetails(BlockDetails {
+                            block_hash: Some(block.blockhash.parse().unwrap()),
+                            block_height: block.block_height,
+                            block_time: block.block_time,
+                            num_reward_partitions: block.num_reward_partitions,
+                            previous_block_hash: Some(block.previous_blockhash.parse().unwrap()),
+                            rewards: block.rewards,
+                            slot
+                        }), id_for_loop.clone())) {
+                            log::error!("Error sending block update: {err:?}");
+                            break;
+                        }
                     }
                     None => {
                         break;
